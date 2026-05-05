@@ -1,31 +1,32 @@
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { useEffect } from "react"
+import { BrowserRouter, Route, Routes } from "react-router-dom"
+import { AppShell } from "@/components/layout/AppShell"
+import { GoalsPage } from "@/pages/GoalsPage"
+import { GoalDetailPage } from "@/pages/GoalDetailPage"
+import { CalendarPage } from "@/pages/CalendarPage"
+import { NotFoundPage } from "@/pages/NotFoundPage"
+import { Toaster } from "@/components/ui/sonner"
+import { useGoalsStore } from "@/stores/goalsStore"
 
 function App() {
+  const hydrate = useGoalsStore((s) => s.hydrate)
+
+  useEffect(() => {
+    hydrate()
+  }, [hydrate])
+
   return (
-    <div className="min-h-svh flex items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Habit Tracker</CardTitle>
-          <CardDescription>
-            Setup verified. Ready to build features.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
-            React + Vite + TypeScript + Tailwind + shadcn/ui are all wired up.
-            Supabase backend lands in the next phase.
-          </p>
-          <Button className="self-start">Looks good</Button>
-        </CardContent>
-      </Card>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<GoalsPage />} />
+          <Route path="goals/:goalId" element={<GoalDetailPage />} />
+          <Route path="calendar" element={<CalendarPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+      <Toaster richColors position="bottom-right" />
+    </BrowserRouter>
   )
 }
 
