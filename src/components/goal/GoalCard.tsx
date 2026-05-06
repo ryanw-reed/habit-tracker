@@ -25,9 +25,9 @@ function progress(goal: Goal): { done: number; total: number } {
   let done = 0
   let total = 0
   for (const route of goal.routes) {
-    for (const item of route.actionItems) {
+    for (const task of route.tasks) {
       total += 1
-      if (item.completed) done += 1
+      if (task.completed) done += 1
     }
   }
   return { done, total }
@@ -113,9 +113,7 @@ export function GoalCard({ goal }: Props) {
               : `${goal.routes.length} routes`}
           </span>
           <span>
-            {total > 0
-              ? `${done}/${total} action items`
-              : "No action items"}
+            {total > 0 ? `${done}/${total} tasks` : "No tasks"}
           </span>
         </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { PlusIcon, XIcon } from "lucide-react"
-import type { ActionItem } from "@/types"
+import type { Task } from "@/types"
 import { useGoalsStore } from "@/stores/goalsStore"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,17 +13,17 @@ import { PanelShell, PanelEmptyState } from "./PanelShell"
 type Props = {
   goalId: string
   routeId: string
-  items: ActionItem[]
+  tasks: Task[]
 }
 
-export function ActionItemsPanel({ goalId, routeId, items }: Props) {
-  const addActionItem = useGoalsStore((s) => s.addActionItem)
+export function TasksPanel({ goalId, routeId, tasks }: Props) {
+  const addTask = useGoalsStore((s) => s.addTask)
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null)
 
-  const completed = items.filter((i) => i.completed).length
+  const completed = tasks.filter((t) => t.completed).length
 
   function handleAdd() {
-    const created = addActionItem(goalId, routeId, {
+    const created = addTask(goalId, routeId, {
       text: "",
       dueDate: null,
     })
@@ -32,15 +32,15 @@ export function ActionItemsPanel({ goalId, routeId, items }: Props) {
 
   return (
     <PanelShell
-      title="Action items"
+      title="Tasks"
       hint="One-off things to check off."
-      count={items.length}
+      count={tasks.length}
       action={
-        items.length > 0 && (
+        tasks.length > 0 && (
           <div className="flex items-center gap-3">
-            {items.length > 0 && (
+            {tasks.length > 0 && (
               <span className="text-xs text-muted-foreground">
-                {completed}/{items.length} done
+                {completed}/{tasks.length} done
               </span>
             )}
             <Button variant="ghost" size="sm" onClick={handleAdd}>
@@ -51,25 +51,25 @@ export function ActionItemsPanel({ goalId, routeId, items }: Props) {
         )
       }
     >
-      {items.length === 0 ? (
+      {tasks.length === 0 ? (
         <PanelEmptyState
-          message="No action items yet."
+          message="No tasks yet."
           action={
             <Button variant="outline" size="sm" onClick={handleAdd}>
               <PlusIcon className="size-4" />
-              Add action item
+              Add task
             </Button>
           }
         />
       ) : (
         <ul className="flex flex-col gap-1.5">
-          {items.map((item) => (
-            <ActionItemRow
-              key={item.id}
+          {tasks.map((task) => (
+            <TaskRow
+              key={task.id}
               goalId={goalId}
               routeId={routeId}
-              item={item}
-              autoFocus={pendingFocusId === item.id}
+              task={task}
+              autoFocus={pendingFocusId === task.id}
               onFocused={() => setPendingFocusId(null)}
             />
           ))}
@@ -79,27 +79,27 @@ export function ActionItemsPanel({ goalId, routeId, items }: Props) {
   )
 }
 
-function ActionItemRow({
+function TaskRow({
   goalId,
   routeId,
-  item,
+  task,
   autoFocus,
   onFocused,
 }: {
   goalId: string
   routeId: string
-  item: ActionItem
+  task: Task
   autoFocus: boolean
   onFocused: () => void
 }) {
-  const updateActionItem = useGoalsStore((s) => s.updateActionItem)
-  const deleteActionItem = useGoalsStore((s) => s.deleteActionItem)
-  const [text, setText] = useState(item.text)
+  const updateTask = useGoalsStore((s) => s.updateTask)
+  const deleteTask = useGoalsStore((s) => s.deleteTask)
+  const [text, setText] = useState(task.text)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    setText(item.text)
-  }, [item.text])
+    setText(task.text)
+  }, [task.text])
 
   useEffect(() => {
     if (autoFocus) {
@@ -110,24 +110,24 @@ function ActionItemRow({
 
   function commitText() {
     const trimmed = text.trim()
-    if (trimmed === item.text) return
+    if (trimmed === task.text) return
     if (trimmed === "") {
-      deleteActionItem(goalId, routeId, item.id)
+      deleteTask(goalId, routeId, task.id)
       return
     }
-    updateActionItem(goalId, routeId, item.id, { text: trimmed })
+    updateTask(goalId, routeId, task.id, { text: trimmed })
     setText(trimmed)
   }
 
-  const days = daysUntil(item.dueDate)
-  const isOverdue = days !== null && days < 0 && !item.completed
+  const days = daysUntil(task.dueDate)
+  const isOverdue = days !== null && days < 0 && !task.completed
 
   return (
     <li className="group/row flex items-start gap-2 rounded-md px-1 py-0.5 hover:bg-muted/40">
       <Checkbox
-        checked={item.completed}
+        checked={task.completed}
         onCheckedChange={(checked) =>
-          updateActionItem(goalId, routeId, item.id, {
+          updateTask(goalId, routeId, task.id, {
             completed: checked === true,
           })
         }
@@ -148,24 +148,24 @@ function ActionItemRow({
         rows={1}
         className={cn(
           "!min-h-8 flex-1 resize-none !border-0 !bg-transparent !px-0 !py-1 !text-sm !shadow-none focus-visible:!ring-0",
-          item.completed && "text-muted-foreground line-through"
+          task.completed && "text-muted-foreground line-through"
         )}
       />
       <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
         <Input
           type="date"
-          value={item.dueDate ?? ""}
+          value={task.dueDate ?? ""}
           onChange={(e) =>
-            updateActionItem(goalId, routeId, item.id, {
+            updateTask(goalId, routeId, task.id, {
               dueDate: e.target.value || null,
             })
           }
           className={cn(
             "h-7 w-[140px] text-xs",
-            !item.dueDate && "text-muted-foreground"
+            !task.dueDate && "text-muted-foreground"
           )}
         />
-        {item.dueDate && (
+        {task.dueDate && (
           <span
             className={cn(
               "hidden text-xs sm:inline",
@@ -173,7 +173,7 @@ function ActionItemRow({
                 ? "text-destructive"
                 : "text-muted-foreground"
             )}
-            title={formatTargetDate(item.dueDate)}
+            title={formatTargetDate(task.dueDate)}
           >
             {describeCountdown(days)}
           </span>
@@ -186,7 +186,7 @@ function ActionItemRow({
         className="mt-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 focus-visible:opacity-100"
         onMouseDown={(e) => {
           e.preventDefault()
-          deleteActionItem(goalId, routeId, item.id)
+          deleteTask(goalId, routeId, task.id)
         }}
         aria-label="Remove"
       >

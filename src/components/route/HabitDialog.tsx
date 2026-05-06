@@ -1,6 +1,12 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react"
+import { InfoIcon, PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { DayOfWeek, Habit } from "@/types"
+import {
+  DEFAULT_HABIT_UNIT_ID,
+  HABIT_UNITS,
+  type HabitUnitId,
+} from "@/config/habitUnits"
 import { useGoalsStore } from "@/stores/goalsStore"
 import {
   Dialog,
@@ -14,7 +20,19 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 type Props = {
@@ -38,9 +56,12 @@ const emptyDraft = {
   name: "",
   daysOfWeek: [] as DayOfWeek[],
   timeOfDay: "" as string,
-  durationMinutes: "" as string,
+  quantity: "" as string,
+  unitId: DEFAULT_HABIT_UNIT_ID as HabitUnitId,
+  incrementQuantity: "" as string,
+  actions: "" as string,
+  context: "" as string,
   linksText: "" as string,
-  notes: "" as string,
 }
 
 function fromHabit(h: Habit) {
@@ -48,10 +69,13 @@ function fromHabit(h: Habit) {
     name: h.name,
     daysOfWeek: h.daysOfWeek,
     timeOfDay: h.timeOfDay ?? "",
-    durationMinutes:
-      h.durationMinutes !== null ? String(h.durationMinutes) : "",
+    quantity: h.quantity !== null ? String(h.quantity) : "",
+    unitId: h.unitId,
+    incrementQuantity:
+      h.incrementQuantity !== null ? String(h.incrementQuantity) : "",
+    actions: h.actions,
+    context: h.context,
     linksText: h.links.join("\n"),
-    notes: h.notes,
   }
 }
 
@@ -89,17 +113,27 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
       .map((l) => l.trim())
       .filter(Boolean)
 
-    const duration = draft.durationMinutes.trim()
-      ? Math.max(0, Number.parseInt(draft.durationMinutes, 10) || 0)
+    const quantity = draft.quantity.trim()
+      ? Math.max(0, Number.parseInt(draft.quantity, 10) || 0)
       : null
+
+    const incrementQuantity = draft.incrementQuantity.trim()
+      ? Math.max(0, Number.parseInt(draft.incrementQuantity, 10) || 0)
+      : null
+
+    const baseQuantity = existing ? existing.baseQuantity : quantity
 
     const payload = {
       name,
       daysOfWeek: draft.daysOfWeek,
       timeOfDay: draft.timeOfDay || null,
-      durationMinutes: duration,
+      quantity,
+      baseQuantity,
+      incrementQuantity,
+      unitId: draft.unitId,
+      actions: draft.actions.trim(),
+      context: draft.context.trim(),
       links,
-      notes: draft.notes.trim(),
     }
 
     if (existing) {
@@ -115,11 +149,11 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{existing ? "Edit habit" : "New habit"}</DialogTitle>
           <DialogDescription>
-            Habits are the recurring practices that build the goal.
+            Habits are the repeated actions, seemingly insignificant, that gradually, almost invisibly, lead to incremental progress to the goal. Simple daily actions, consistently repeated over enough time is the formula, and nature, of all progress.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -163,7 +197,7 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="habit-time">Time of day</Label>
               <Input
@@ -173,24 +207,132 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, timeOfDay: e.target.value }))
                 }
+                className="w-32"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="habit-duration">Duration (min)</Label>
-              <Input
-                id="habit-duration"
-                type="number"
-                min={0}
-                value={draft.durationMinutes}
-                onChange={(e) =>
-                  setDraft((d) => ({
-                    ...d,
-                    durationMinutes: e.target.value,
-                  }))
-                }
-                placeholder="e.g. 30"
-              />
+              <Label htmlFor="habit-quantity">Duration</Label>
+              <div className="flex">
+                <Input
+                  id="habit-quantity"
+                  type="number"
+                  min={0}
+                  value={draft.quantity}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, quantity: e.target.value }))
+                  }
+                  placeholder="0"
+                  className="w-20 rounded-r-none focus-visible:z-10"
+                />
+                <Select
+                  value={draft.unitId}
+                  onValueChange={(v) =>
+                    setDraft((d) => ({ ...d, unitId: v as HabitUnitId }))
+                  }
+                >
+                  <SelectTrigger
+                    aria-label="Unit"
+                    className="h-9 w-20 rounded-l-none border-l-0 focus-visible:z-10"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HABIT_UNITS.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.shortLabel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+            <div className="flex flex-col gap-1.5">
+              <Label
+                htmlFor="habit-increment"
+                className="flex items-center gap-1.5"
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="About increment"
+                      className="inline-flex size-3.5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <InfoIcon className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent />
+                </Tooltip>
+                Increment
+              </Label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  id="habit-increment"
+                  type="number"
+                  min={0}
+                  value={draft.incrementQuantity}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      incrementQuantity: e.target.value,
+                    }))
+                  }
+                  placeholder="0"
+                  className="w-16"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Advance duration by increment"
+                  title="Advance duration by increment"
+                  disabled={
+                    !draft.quantity.trim() ||
+                    !draft.incrementQuantity.trim() ||
+                    Number.parseInt(draft.incrementQuantity, 10) <= 0
+                  }
+                  onClick={() => {
+                    const current =
+                      Number.parseInt(draft.quantity, 10) || 0
+                    const inc =
+                      Number.parseInt(draft.incrementQuantity, 10) || 0
+                    setDraft((d) => ({
+                      ...d,
+                      quantity: String(current + inc),
+                    }))
+                  }}
+                  className="shrink-0"
+                >
+                  <PlusIcon className="size-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="habit-actions">Actions</Label>
+            <Textarea
+              id="habit-actions"
+              value={draft.actions}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, actions: e.target.value }))
+              }
+              placeholder="What to do, step by step…"
+              rows={3}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="habit-context">Context</Label>
+            <Textarea
+              id="habit-context"
+              value={draft.context}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, context: e.target.value }))
+              }
+              placeholder="Cues, form notes, modifications…"
+              rows={3}
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -203,19 +345,6 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
               }
               placeholder="https://..."
               rows={2}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="habit-notes">Notes</Label>
-            <Textarea
-              id="habit-notes"
-              value={draft.notes}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, notes: e.target.value }))
-              }
-              placeholder="Cues, form notes, modifications…"
-              rows={3}
             />
           </div>
 

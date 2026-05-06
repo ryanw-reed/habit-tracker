@@ -1,13 +1,13 @@
 import { create } from "zustand"
 import { nanoid } from "nanoid"
 import type {
-  ActionItem,
   AppData,
   Experiment,
   Goal,
   Habit,
   MaintenanceItem,
   Route,
+  Task,
 } from "@/types"
 import { repository } from "@/lib/repository"
 
@@ -18,7 +18,7 @@ type GoalDraft = {
 }
 
 type HabitDraft = Omit<Habit, "id">
-type ActionItemDraft = Omit<ActionItem, "id" | "completed"> & {
+type TaskDraft = Omit<Task, "id" | "completed"> & {
   completed?: boolean
 }
 type ExperimentDraft = Omit<Experiment, "id">
@@ -53,22 +53,28 @@ type GoalsState = {
     patch: Partial<Habit>
   ) => void
   deleteHabit: (goalId: string, routeId: string, habitId: string) => void
-
-  addActionItem: (
+  moveHabit: (
     goalId: string,
     routeId: string,
-    draft: ActionItemDraft
-  ) => ActionItem | undefined
-  updateActionItem: (
-    goalId: string,
-    routeId: string,
-    itemId: string,
-    patch: Partial<ActionItem>
+    habitId: string,
+    direction: -1 | 1
   ) => void
-  deleteActionItem: (
+
+  addTask: (
     goalId: string,
     routeId: string,
-    itemId: string
+    draft: TaskDraft
+  ) => Task | undefined
+  updateTask: (
+    goalId: string,
+    routeId: string,
+    taskId: string,
+    patch: Partial<Task>
+  ) => void
+  deleteTask: (
+    goalId: string,
+    routeId: string,
+    taskId: string
   ) => void
 
   addExperiment: (
@@ -193,7 +199,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => {
         id: nanoid(),
         name: name.trim() || "Untitled route",
         habits: [],
-        actionItems: [],
+        tasks: [],
         experiments: [],
         maintenance: [],
       }
@@ -250,32 +256,44 @@ export const useGoalsStore = create<GoalsState>((set, get) => {
       }))
     },
 
-    addActionItem: (goalId, routeId, draft) => {
-      const item: ActionItem = {
+    moveHabit: (goalId, routeId, habitId, direction) => {
+      applyRoutePatch(goalId, routeId, (r) => {
+        const idx = r.habits.findIndex((h) => h.id === habitId)
+        if (idx === -1) return r
+        const target = idx + direction
+        if (target < 0 || target >= r.habits.length) return r
+        const next = [...r.habits]
+        ;[next[idx], next[target]] = [next[target], next[idx]]
+        return { ...r, habits: next }
+      })
+    },
+
+    addTask: (goalId, routeId, draft) => {
+      const task: Task = {
         id: nanoid(),
         completed: false,
         ...draft,
       }
       applyRoutePatch(goalId, routeId, (r) => ({
         ...r,
-        actionItems: [...r.actionItems, item],
+        tasks: [...r.tasks, task],
       }))
-      return item
+      return task
     },
 
-    updateActionItem: (goalId, routeId, itemId, patch) => {
+    updateTask: (goalId, routeId, taskId, patch) => {
       applyRoutePatch(goalId, routeId, (r) => ({
         ...r,
-        actionItems: r.actionItems.map((i) =>
-          i.id === itemId ? { ...i, ...patch } : i
+        tasks: r.tasks.map((t) =>
+          t.id === taskId ? { ...t, ...patch } : t
         ),
       }))
     },
 
-    deleteActionItem: (goalId, routeId, itemId) => {
+    deleteTask: (goalId, routeId, taskId) => {
       applyRoutePatch(goalId, routeId, (r) => ({
         ...r,
-        actionItems: r.actionItems.filter((i) => i.id !== itemId),
+        tasks: r.tasks.filter((t) => t.id !== taskId),
       }))
     },
 

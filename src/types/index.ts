@@ -1,4 +1,5 @@
 import type { GoalSectionId } from "@/config/goalSections"
+import type { HabitUnitId } from "@/config/habitUnits"
 
 export type ID = string
 
@@ -19,7 +20,7 @@ export type Route = {
   id: ID
   name: string
   habits: Habit[]
-  actionItems: ActionItem[]
+  tasks: Task[]
   experiments: Experiment[]
   maintenance: MaintenanceItem[]
 }
@@ -31,12 +32,16 @@ export type Habit = {
   name: string
   daysOfWeek: DayOfWeek[]
   timeOfDay: string | null
-  durationMinutes: number | null
+  quantity: number | null
+  baseQuantity: number | null
+  incrementQuantity: number | null
+  unitId: HabitUnitId
+  actions: string
+  context: string
   links: string[]
-  notes: string
 }
 
-export type ActionItem = {
+export type Task = {
   id: ID
   text: string
   completed: boolean

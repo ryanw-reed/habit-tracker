@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/tabs"
 import { RouteName } from "./RouteName"
 import { HabitsPanel } from "./HabitsPanel"
-import { ActionItemsPanel } from "./ActionItemsPanel"
+import { TasksPanel } from "./TasksPanel"
 import { ExperimentsPanel } from "./ExperimentsPanel"
 import { MaintenancePanel } from "./MaintenancePanel"
 
@@ -105,10 +105,10 @@ export function RoutesTabs({ goal }: Props) {
               routeId={route.id}
               habits={route.habits}
             />
-            <ActionItemsPanel
+            <TasksPanel
               goalId={goal.id}
               routeId={route.id}
-              items={route.actionItems}
+              tasks={route.tasks}
             />
             <ExperimentsPanel
               goalId={goal.id}

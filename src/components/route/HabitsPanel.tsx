@@ -1,7 +1,15 @@
-import { ClockIcon, PlusIcon, TimerIcon, Trash2Icon } from "lucide-react"
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ClockIcon,
+  PlusIcon,
+  TimerIcon,
+  Trash2Icon,
+} from "lucide-react"
 import { format, parse } from "date-fns"
 import { toast } from "sonner"
 import type { DayOfWeek, Habit } from "@/types"
+import { getHabitUnit } from "@/config/habitUnits"
 import { useGoalsStore } from "@/stores/goalsStore"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,7 +18,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
 import { PanelShell, PanelEmptyState } from "./PanelShell"
 import { HabitDialog } from "./HabitDialog"
 
@@ -20,15 +27,25 @@ type Props = {
   habits: Habit[]
 }
 
-const DAYS: { value: DayOfWeek; label: string }[] = [
-  { value: 1, label: "M" },
-  { value: 2, label: "T" },
-  { value: 3, label: "W" },
-  { value: 4, label: "T" },
-  { value: 5, label: "F" },
-  { value: 6, label: "S" },
-  { value: 0, label: "S" },
-]
+const FULL_DAY_NAMES: Record<DayOfWeek, string> = {
+  1: "Monday",
+  2: "Tuesday",
+  3: "Wednesday",
+  4: "Thursday",
+  5: "Friday",
+  6: "Saturday",
+  0: "Sunday",
+}
+
+const ORDERED_DAYS: DayOfWeek[] = [1, 2, 3, 4, 5, 6, 0]
+
+function formatDays(days: DayOfWeek[]): string {
+  if (days.length === 0) return ""
+  if (days.length === 7) return "Every day"
+  return ORDERED_DAYS.filter((d) => days.includes(d))
+    .map((d) => FULL_DAY_NAMES[d])
+    .join(", ")
+}
 
 function formatTime(time: string | null): string | null {
   if (!time) return null
@@ -43,7 +60,7 @@ export function HabitsPanel({ goalId, routeId, habits }: Props) {
   return (
     <PanelShell
       title="Habits"
-      hint="Recurring practices that build the goal."
+      hint="Repeated actions."
       count={habits.length}
       action={
         habits.length > 0 && (
@@ -78,12 +95,14 @@ export function HabitsPanel({ goalId, routeId, habits }: Props) {
         />
       ) : (
         <ul className="flex flex-col gap-2">
-          {habits.map((habit) => (
+          {habits.map((habit, index) => (
             <HabitRow
               key={habit.id}
               goalId={goalId}
               routeId={routeId}
               habit={habit}
+              index={index}
+              total={habits.length}
             />
           ))}
         </ul>
@@ -96,12 +115,17 @@ function HabitRow({
   goalId,
   routeId,
   habit,
+  index,
+  total,
 }: {
   goalId: string
   routeId: string
   habit: Habit
+  index: number
+  total: number
 }) {
   const deleteHabit = useGoalsStore((s) => s.deleteHabit)
+  const moveHabit = useGoalsStore((s) => s.moveHabit)
   const time = formatTime(habit.timeOfDay)
 
   return (
@@ -118,47 +142,59 @@ function HabitRow({
           />
         }
       />
-      <div className="relative z-0 flex items-start justify-between gap-3">
+      <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium">{habit.name}</div>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              {DAYS.map((d) => {
-                const active = habit.daysOfWeek.includes(d.value)
-                return (
-                  <span
-                    key={d.value}
-                    className={cn(
-                      "flex size-5 items-center justify-center rounded-sm text-[10px] font-medium",
-                      active
-                        ? "bg-foreground text-background"
-                        : "bg-muted text-muted-foreground/60"
-                    )}
-                    title={d.label}
-                  >
-                    {d.label}
-                  </span>
-                )
-              })}
-            </div>
+            {habit.daysOfWeek.length > 0 && (
+              <span className="font-medium text-foreground">
+                {formatDays(habit.daysOfWeek)}
+              </span>
+            )}
             {time && (
               <span className="inline-flex items-center gap-1">
                 <ClockIcon className="size-3.5" />
                 {time}
               </span>
             )}
-            {habit.durationMinutes !== null && (
+            {habit.quantity !== null && (
               <span className="inline-flex items-center gap-1">
                 <TimerIcon className="size-3.5" />
-                {habit.durationMinutes} min
+                {habit.quantity} {getHabitUnit(habit.unitId).shortLabel}
               </span>
             )}
           </div>
-          {habit.notes && (
+          {(habit.actions || habit.context) && (
             <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
-              {habit.notes}
+              {habit.actions || habit.context}
             </p>
           )}
+        </div>
+        <div className="relative z-20 flex shrink-0 flex-col opacity-0 transition-opacity group-hover/habit:opacity-100 focus-within:opacity-100">
+          <button
+            type="button"
+            disabled={index === 0}
+            onClick={(e) => {
+              e.stopPropagation()
+              moveHabit(goalId, routeId, habit.id, -1)
+            }}
+            aria-label="Move habit up"
+            className="flex size-4 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+          >
+            <ChevronUpIcon className="size-3" />
+          </button>
+          <button
+            type="button"
+            disabled={index === total - 1}
+            onClick={(e) => {
+              e.stopPropagation()
+              moveHabit(goalId, routeId, habit.id, 1)
+            }}
+            aria-label="Move habit down"
+            className="flex size-4 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+          >
+            <ChevronDownIcon className="size-3" />
+          </button>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
