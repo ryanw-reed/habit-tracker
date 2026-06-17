@@ -30,6 +30,7 @@ export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6
 export type Habit = {
   id: ID
   name: string
+  calendarAlias?: string
   daysOfWeek: DayOfWeek[]
   timeOfDay: string | null
   quantity: number | null
@@ -39,6 +40,7 @@ export type Habit = {
   actions: string
   context: string
   links: string[]
+  completedDates: string[]
 }
 
 export type Task = {

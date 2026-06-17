@@ -17,7 +17,7 @@ type GoalDraft = {
   targetDate?: string | null
 }
 
-type HabitDraft = Omit<Habit, "id">
+type HabitDraft = Omit<Habit, "id" | "completedDates">
 type TaskDraft = Omit<Task, "id" | "completed"> & {
   completed?: boolean
 }
@@ -58,6 +58,12 @@ type GoalsState = {
     routeId: string,
     habitId: string,
     direction: -1 | 1
+  ) => void
+  toggleHabitCompletion: (
+    goalId: string,
+    routeId: string,
+    habitId: string,
+    dateKey: string
   ) => void
 
   addTask: (
@@ -232,7 +238,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => {
     },
 
     addHabit: (goalId, routeId, draft) => {
-      const habit: Habit = { id: nanoid(), ...draft }
+      const habit: Habit = { id: nanoid(), completedDates: [], ...draft }
       applyRoutePatch(goalId, routeId, (r) => ({
         ...r,
         habits: [...r.habits, habit],
@@ -266,6 +272,22 @@ export const useGoalsStore = create<GoalsState>((set, get) => {
         ;[next[idx], next[target]] = [next[target], next[idx]]
         return { ...r, habits: next }
       })
+    },
+
+    toggleHabitCompletion: (goalId, routeId, habitId, dateKey) => {
+      applyRoutePatch(goalId, routeId, (r) => ({
+        ...r,
+        habits: r.habits.map((h) => {
+          if (h.id !== habitId) return h
+          const has = h.completedDates.includes(dateKey)
+          return {
+            ...h,
+            completedDates: has
+              ? h.completedDates.filter((d) => d !== dateKey)
+              : [...h.completedDates, dateKey],
+          }
+        }),
+      }))
     },
 
     addTask: (goalId, routeId, draft) => {

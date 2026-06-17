@@ -6,10 +6,10 @@ import {
   TimerIcon,
   Trash2Icon,
 } from "lucide-react"
-import { format, parse } from "date-fns"
 import { toast } from "sonner"
-import type { DayOfWeek, Habit } from "@/types"
+import type { Habit } from "@/types"
 import { getHabitUnit } from "@/config/habitUnits"
+import { formatDays, formatTime } from "@/lib/dates"
 import { useGoalsStore } from "@/stores/goalsStore"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,35 +25,6 @@ type Props = {
   goalId: string
   routeId: string
   habits: Habit[]
-}
-
-const FULL_DAY_NAMES: Record<DayOfWeek, string> = {
-  1: "Monday",
-  2: "Tuesday",
-  3: "Wednesday",
-  4: "Thursday",
-  5: "Friday",
-  6: "Saturday",
-  0: "Sunday",
-}
-
-const ORDERED_DAYS: DayOfWeek[] = [1, 2, 3, 4, 5, 6, 0]
-
-function formatDays(days: DayOfWeek[]): string {
-  if (days.length === 0) return ""
-  if (days.length === 7) return "Every day"
-  return ORDERED_DAYS.filter((d) => days.includes(d))
-    .map((d) => FULL_DAY_NAMES[d])
-    .join(", ")
-}
-
-function formatTime(time: string | null): string | null {
-  if (!time) return null
-  try {
-    return format(parse(time, "HH:mm", new Date()), "h:mm a")
-  } catch {
-    return time
-  }
 }
 
 export function HabitsPanel({ goalId, routeId, habits }: Props) {

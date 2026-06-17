@@ -1,6 +1,6 @@
 import type { AppData } from "@/types"
 
-export const CURRENT_SCHEMA_VERSION = 5
+export const CURRENT_SCHEMA_VERSION = 6
 
 export type StoredEnvelope = {
   schemaVersion: number
@@ -92,6 +92,24 @@ const migrations: Record<number, Migration> = {
               typeof rest.unitId === "string" ? rest.unitId : "minutes",
           }
         })
+        return { ...route, habits: migratedHabits }
+      })
+      return { ...goal, routes: migratedRoutes }
+    })
+    return { goals }
+  },
+  6: (rawV5: unknown) => {
+    const v5 = rawV5 as { goals?: Array<Record<string, unknown>> }
+    const goals = (v5.goals ?? []).map((goal) => {
+      const routes = (goal.routes ?? []) as Array<Record<string, unknown>>
+      const migratedRoutes = routes.map((route) => {
+        const habits = (route.habits ?? []) as Array<Record<string, unknown>>
+        const migratedHabits = habits.map((habit) => ({
+          ...habit,
+          completedDates: Array.isArray(habit.completedDates)
+            ? habit.completedDates
+            : [],
+        }))
         return { ...route, habits: migratedHabits }
       })
       return { ...goal, routes: migratedRoutes }

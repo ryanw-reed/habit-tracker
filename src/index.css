@@ -41,6 +41,8 @@
     --color-background: var(--background);
     --color-accent-action: var(--accent-action);
     --color-accent-action-foreground: var(--accent-action-foreground);
+    --color-accent-done: var(--accent-done);
+    --color-accent-done-foreground: var(--accent-done-foreground);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -85,6 +87,8 @@
     --sidebar-ring: oklch(0.708 0 0);
     --accent-action: oklch(0.4 0 0);
     --accent-action-foreground: oklch(0.985 0 0);
+    --accent-done: oklch(0.55 0.13 150);
+    --accent-done-foreground: oklch(0.985 0 0);
 }
 
 .dark {
@@ -121,6 +125,8 @@
     --sidebar-ring: oklch(0.556 0 0);
     --accent-action: oklch(0.75 0 0);
     --accent-action-foreground: oklch(0.145 0 0);
+    --accent-done: oklch(0.72 0.15 150);
+    --accent-done-foreground: oklch(0.145 0 0);
 }
 
 @layer base {
