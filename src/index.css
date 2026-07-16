@@ -43,6 +43,7 @@
     --color-accent-action-foreground: var(--accent-action-foreground);
     --color-accent-done: var(--accent-done);
     --color-accent-done-foreground: var(--accent-done-foreground);
+    --color-accent-overload: var(--accent-overload);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -89,6 +90,7 @@
     --accent-action-foreground: oklch(0.985 0 0);
     --accent-done: oklch(0.55 0.13 150);
     --accent-done-foreground: oklch(0.985 0 0);
+    --accent-overload: oklch(0.58 0.16 300);
 }
 
 .dark {
@@ -127,6 +129,7 @@
     --accent-action-foreground: oklch(0.145 0 0);
     --accent-done: oklch(0.72 0.15 150);
     --accent-done-foreground: oklch(0.145 0 0);
+    --accent-overload: oklch(0.78 0.13 300);
 }
 
 @layer base {

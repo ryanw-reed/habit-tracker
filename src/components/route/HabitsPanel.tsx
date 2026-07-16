@@ -8,8 +8,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Habit } from "@/types"
-import { getHabitUnit } from "@/config/habitUnits"
 import { formatDays, formatTime } from "@/lib/dates"
+import { formatHabitTarget } from "@/lib/habits"
 import { useGoalsStore } from "@/stores/goalsStore"
 import { Button } from "@/components/ui/button"
 import {
@@ -98,6 +98,7 @@ function HabitRow({
   const deleteHabit = useGoalsStore((s) => s.deleteHabit)
   const moveHabit = useGoalsStore((s) => s.moveHabit)
   const time = formatTime(habit.timeOfDay)
+  const target = formatHabitTarget(habit)
 
   return (
     <li className="group/habit relative rounded-lg border border-border p-3 transition-colors hover:bg-muted/40">
@@ -128,10 +129,10 @@ function HabitRow({
                 {time}
               </span>
             )}
-            {habit.quantity !== null && (
+            {target && (
               <span className="inline-flex items-center gap-1">
                 <TimerIcon className="size-3.5" />
-                {habit.quantity} {getHabitUnit(habit.unitId).shortLabel}
+                {target}
               </span>
             )}
           </div>

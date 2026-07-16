@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Working principles
 
-These two rules supersede everything else.
+These three rules supersede everything else.
 
 1. **Always present options before making a change.** When the user asks for something to be changed, do not silently pick an approach and execute. Surface the relevant options, explain *how* each one works, explain the *rationale* (trade-offs, implications), and state your *recommended* choice based on your expertise and what is in the long-term best interest of the project and the code. Then wait for confirmation.
 
 2. **Always fix at the deepest layer of the code.** Diagnose root causes; do not patch symptoms. Never resolve a bug by removing the feature or use case that exposed it. Never introduce hacks, workarounds, or "quick fixes" that paper over an underlying issue. If the right fix is structurally larger than the original ask, surface that — do not quietly take the cheap route.
+
+3. **Never let the app claim more than it does.** Proactively surface any gap between what the UI *states* (copy, labels, tooltips, empty states, dialog text) or *implies* (a progress bar, a metric, a count) and what the code actually does — without being asked, and even when the wording came from the user. This project exists to produce documentation that is honest and hyper-actionable; UI that promises unbuilt behavior, or implies precision it doesn't have, quietly corrodes that. When you find a gap, name it and offer the options — reword to match reality, build the missing behavior, or knowingly accept it — but never silently ship the mismatch. Past examples: the Increment tooltip describing automatic progression while the `+` button is manual; the GoalCard progress bar implying goal progress while measuring only action-item completion.
 
 ## Commands
 

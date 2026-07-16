@@ -111,6 +111,8 @@ export function DayHabitsOverlay({ date, habits, onOpenChange }: Props) {
               goalId={selected.goalId}
               routeId={selected.routeId}
               habitId={selected.habitId}
+              dateKey={dateKey}
+              performance={selected.performance}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">

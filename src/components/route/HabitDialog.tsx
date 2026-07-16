@@ -1,10 +1,15 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react"
-import { InfoIcon, PlusIcon } from "lucide-react"
+import { PlusIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
-import type { DayOfWeek, Habit } from "@/types"
+import type { DayOfWeek, Habit, HabitLink } from "@/types"
 import {
   DEFAULT_HABIT_UNIT_ID,
-  HABIT_UNITS,
+  DEFAULT_REST_UNIT_ID,
+  DEFAULT_TOTAL_UNIT_ID,
+  DURATION_UNIT_CATEGORIES,
+  REST_UNIT_CATEGORIES,
+  TOTAL_UNIT_CATEGORIES,
+  unitsForCategories,
   type HabitUnitId,
 } from "@/config/habitUnits"
 import { useGoalsStore } from "@/stores/goalsStore"
@@ -28,11 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Hint } from "@/components/ui/hint"
 import { cn } from "@/lib/utils"
 
 type Props = {
@@ -58,10 +59,15 @@ const emptyDraft = {
   timeOfDay: "" as string,
   quantity: "" as string,
   unitId: DEFAULT_HABIT_UNIT_ID as HabitUnitId,
+  intervalOn: false,
+  restQuantity: "" as string,
+  restUnitId: DEFAULT_REST_UNIT_ID as HabitUnitId,
+  totalQuantity: "" as string,
+  totalUnitId: DEFAULT_TOTAL_UNIT_ID as HabitUnitId,
   incrementQuantity: "" as string,
   actions: "" as string,
   context: "" as string,
-  linksText: "" as string,
+  links: [] as HabitLink[],
 }
 
 function fromHabit(h: Habit) {
@@ -71,11 +77,17 @@ function fromHabit(h: Habit) {
     timeOfDay: h.timeOfDay ?? "",
     quantity: h.quantity !== null ? String(h.quantity) : "",
     unitId: h.unitId,
+    // Interval mode is inferred — no separate persisted flag to disagree with.
+    intervalOn: h.restQuantity !== null,
+    restQuantity: h.restQuantity !== null ? String(h.restQuantity) : "",
+    restUnitId: h.restUnitId ?? DEFAULT_REST_UNIT_ID,
+    totalQuantity: h.totalQuantity !== null ? String(h.totalQuantity) : "",
+    totalUnitId: h.totalUnitId ?? DEFAULT_TOTAL_UNIT_ID,
     incrementQuantity:
       h.incrementQuantity !== null ? String(h.incrementQuantity) : "",
     actions: h.actions,
     context: h.context,
-    linksText: h.links.join("\n"),
+    links: h.links.map((l) => ({ ...l })),
   }
 }
 
@@ -94,6 +106,28 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
     }
   }, [open, existing])
 
+  // Derived during render — no effect/state syncing.
+  // Blank means "no target set" and stays valid; 0 does not (you have to start
+  // somewhere). Increment is exempt: 0 is how you say "no progression".
+  const errors: string[] = []
+  {
+    const atLeastOne = (raw: string, label: string) => {
+      const v = raw.trim()
+      if (v && (Number.parseInt(v, 10) || 0) < 1) {
+        errors.push(`${label} must be at least 1.`)
+      }
+    }
+    if (draft.intervalOn && !draft.quantity.trim()) {
+      errors.push("Add a duration to use on/off.")
+    }
+    if (draft.intervalOn && !draft.restQuantity.trim()) {
+      errors.push("Add a rest value to use on/off.")
+    }
+    atLeastOne(draft.quantity, "Duration")
+    atLeastOne(draft.restQuantity, "Rest")
+    atLeastOne(draft.totalQuantity, "Total")
+  }
+
   function toggleDay(day: DayOfWeek) {
     setDraft((d) => ({
       ...d,
@@ -106,12 +140,13 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const name = draft.name.trim()
-    if (!name) return
+    if (!name || errors.length > 0) return
 
-    const links = draft.linksText
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
+    // A row with no URL has nothing to link to — drop it, matching the
+    // "empty values remove the row" convention used elsewhere.
+    const links: HabitLink[] = draft.links
+      .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
+      .filter((l) => l.url)
 
     const quantity = draft.quantity.trim()
       ? Math.max(0, Number.parseInt(draft.quantity, 10) || 0)
@@ -123,6 +158,15 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
 
     const baseQuantity = existing ? existing.baseQuantity : quantity
 
+    const restQuantity =
+      draft.intervalOn && draft.restQuantity.trim()
+        ? Math.max(0, Number.parseInt(draft.restQuantity, 10) || 0)
+        : null
+
+    const totalQuantity = draft.totalQuantity.trim()
+      ? Math.max(0, Number.parseInt(draft.totalQuantity, 10) || 0)
+      : null
+
     const payload = {
       name,
       daysOfWeek: draft.daysOfWeek,
@@ -131,6 +175,10 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
       baseQuantity,
       incrementQuantity,
       unitId: draft.unitId,
+      restQuantity,
+      restUnitId: restQuantity !== null ? draft.restUnitId : null,
+      totalQuantity,
+      totalUnitId: totalQuantity !== null ? draft.totalUnitId : null,
       actions: draft.actions.trim(),
       context: draft.context.trim(),
       links,
@@ -149,7 +197,7 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>{existing ? "Edit habit" : "New habit"}</DialogTitle>
           <DialogDescription>
@@ -177,21 +225,21 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
               {DAY_LABELS.map((d) => {
                 const active = draft.daysOfWeek.includes(d.value)
                 return (
-                  <button
-                    key={d.value}
-                    type="button"
-                    onClick={() => toggleDay(d.value)}
-                    aria-pressed={active}
-                    title={d.full}
-                    className={cn(
-                      "flex size-8 items-center justify-center rounded-md text-xs font-medium transition-colors",
-                      active
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/70"
-                    )}
-                  >
-                    {d.label}
-                  </button>
+                  <Hint key={d.value} text={d.full}>
+                    <button
+                      type="button"
+                      onClick={() => toggleDay(d.value)}
+                      aria-pressed={active}
+                      className={cn(
+                        "flex size-8 items-center justify-center rounded-md text-xs font-medium transition-colors",
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-muted/70"
+                      )}
+                    >
+                      {d.label}
+                    </button>
+                  </Hint>
                 )
               })}
             </div>
@@ -211,33 +259,157 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="habit-quantity">Duration</Label>
+              <Label htmlFor="habit-quantity" className="flex items-center gap-2">
+                Duration
+                <Hint text="Add a rest interval (work / rest)">
+                  <button
+                    type="button"
+                    aria-pressed={draft.intervalOn}
+                    onClick={() =>
+                      setDraft((d) => ({ ...d, intervalOn: !d.intervalOn }))
+                    }
+                    className={cn(
+                      "rounded-md border border-border px-1.5 py-0.5 text-[10px] leading-none font-medium transition-colors",
+                      draft.intervalOn
+                        ? "bg-muted text-foreground"
+                        : "bg-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    on/off
+                  </button>
+                </Hint>
+              </Label>
+              <div className="flex items-center gap-2">
+                <div className="flex">
+                  <Input
+                    id="habit-quantity"
+                    type="number"
+                    min={1}
+                    value={draft.quantity}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, quantity: e.target.value }))
+                    }
+                    placeholder="0"
+                    className="w-20 rounded-r-none focus-visible:z-10"
+                  />
+                  <Select
+                    value={draft.unitId}
+                    onValueChange={(v) =>
+                      setDraft((d) => ({ ...d, unitId: v as HabitUnitId }))
+                    }
+                  >
+                    <SelectTrigger
+                      aria-label="Duration unit"
+                      className="h-9 w-20 rounded-l-none border-l-0 focus-visible:z-10"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unitsForCategories(DURATION_UNIT_CATEGORIES).map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.shortLabel}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {draft.intervalOn && (
+                  <>
+                    <span className="text-sm text-muted-foreground">/</span>
+                    <div className="flex">
+                      <Input
+                        type="number"
+                        min={1}
+                        aria-label="Rest duration"
+                        value={draft.restQuantity}
+                        onChange={(e) =>
+                          setDraft((d) => ({
+                            ...d,
+                            restQuantity: e.target.value,
+                          }))
+                        }
+                        placeholder="0"
+                        className="w-20 rounded-r-none focus-visible:z-10"
+                      />
+                      <Select
+                        value={draft.restUnitId}
+                        onValueChange={(v) =>
+                          setDraft((d) => ({
+                            ...d,
+                            restUnitId: v as HabitUnitId,
+                          }))
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label="Rest unit"
+                          className="h-9 w-20 rounded-l-none border-l-0 focus-visible:z-10"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unitsForCategories(REST_UNIT_CATEGORIES).map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.shortLabel}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Hint
+                className="max-w-sm"
+                text="Method to implement the concept of progressive overload. Each time you complete a Habit on the calendar, you'll be asked whether to increase the Duration by this amount for the next instance. Leave at 0 for no progression."
+              >
+                <Label htmlFor="habit-increment">Increment</Label>
+              </Hint>
+              <Input
+                id="habit-increment"
+                type="number"
+                min={0}
+                value={draft.incrementQuantity}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    incrementQuantity: e.target.value,
+                  }))
+                }
+                placeholder="0"
+                className="w-16"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="habit-total">Total</Label>
               <div className="flex">
                 <Input
-                  id="habit-quantity"
+                  id="habit-total"
                   type="number"
-                  min={0}
-                  value={draft.quantity}
+                  min={1}
+                  value={draft.totalQuantity}
                   onChange={(e) =>
-                    setDraft((d) => ({ ...d, quantity: e.target.value }))
+                    setDraft((d) => ({ ...d, totalQuantity: e.target.value }))
                   }
                   placeholder="0"
                   className="w-20 rounded-r-none focus-visible:z-10"
                 />
                 <Select
-                  value={draft.unitId}
+                  value={draft.totalUnitId}
                   onValueChange={(v) =>
-                    setDraft((d) => ({ ...d, unitId: v as HabitUnitId }))
+                    setDraft((d) => ({ ...d, totalUnitId: v as HabitUnitId }))
                   }
                 >
                   <SelectTrigger
-                    aria-label="Unit"
-                    className="h-9 w-20 rounded-l-none border-l-0 focus-visible:z-10"
+                    aria-label="Total unit"
+                    className="h-9 w-24 rounded-l-none border-l-0 focus-visible:z-10"
                   >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {HABIT_UNITS.map((u) => (
+                    {unitsForCategories(TOTAL_UNIT_CATEGORIES).map((u) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.shortLabel}
                       </SelectItem>
@@ -246,68 +418,17 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
                 </Select>
               </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label
-                htmlFor="habit-increment"
-                className="flex items-center gap-1.5"
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="About increment"
-                      className="inline-flex size-3.5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <InfoIcon className="size-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent />
-                </Tooltip>
-                Increment
-              </Label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  id="habit-increment"
-                  type="number"
-                  min={0}
-                  value={draft.incrementQuantity}
-                  onChange={(e) =>
-                    setDraft((d) => ({
-                      ...d,
-                      incrementQuantity: e.target.value,
-                    }))
-                  }
-                  placeholder="0"
-                  className="w-16"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label="Advance duration by increment"
-                  title="Advance duration by increment"
-                  disabled={
-                    !draft.quantity.trim() ||
-                    !draft.incrementQuantity.trim() ||
-                    Number.parseInt(draft.incrementQuantity, 10) <= 0
-                  }
-                  onClick={() => {
-                    const current =
-                      Number.parseInt(draft.quantity, 10) || 0
-                    const inc =
-                      Number.parseInt(draft.incrementQuantity, 10) || 0
-                    setDraft((d) => ({
-                      ...d,
-                      quantity: String(current + inc),
-                    }))
-                  }}
-                  className="shrink-0"
-                >
-                  <PlusIcon className="size-4" />
-                </Button>
-              </div>
-            </div>
           </div>
+
+          {errors.length > 0 && (
+            <ul className="-mt-2 flex flex-col gap-0.5">
+              {errors.map((message) => (
+                <li key={message} className="text-xs text-destructive">
+                  {message}
+                </li>
+              ))}
+            </ul>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="habit-actions">Actions</Label>
@@ -336,16 +457,73 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="habit-links">Links (one per line)</Label>
-            <Textarea
-              id="habit-links"
-              value={draft.linksText}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, linksText: e.target.value }))
+            <Label>Links</Label>
+            {draft.links.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {draft.links.map((link, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      aria-label="Link name"
+                      value={link.label}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          links: d.links.map((l, i) =>
+                            i === index ? { ...l, label: e.target.value } : l
+                          ),
+                        }))
+                      }
+                      placeholder="Name"
+                      className="w-48 shrink-0"
+                    />
+                    <Input
+                      aria-label="Link URL"
+                      value={link.url}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          links: d.links.map((l, i) =>
+                            i === index ? { ...l, url: e.target.value } : l
+                          ),
+                        }))
+                      }
+                      placeholder="https://..."
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Remove link"
+                      className="shrink-0 text-muted-foreground"
+                      onClick={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          links: d.links.filter((_, i) => i !== index),
+                        }))
+                      }
+                    >
+                      <XIcon className="size-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="self-start text-muted-foreground"
+              onClick={() =>
+                setDraft((d) => ({
+                  ...d,
+                  links: [...d.links, { label: "", url: "" }],
+                }))
               }
-              placeholder="https://..."
-              rows={2}
-            />
+            >
+              <PlusIcon className="size-4" />
+              Add link
+            </Button>
           </div>
 
           <DialogFooter className="mt-2">
@@ -356,7 +534,10 @@ export function HabitDialog({ goalId, routeId, trigger, existing }: Props) {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!draft.name.trim()}>
+            <Button
+              type="submit"
+              disabled={!draft.name.trim() || errors.length > 0}
+            >
               {existing ? "Save changes" : "Add habit"}
             </Button>
           </DialogFooter>

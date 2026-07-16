@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Hint } from "@/components/ui/hint"
 import { cn } from "@/lib/utils"
 import { describeCountdown, daysUntil, formatTargetDate } from "@/lib/dates"
 import { PanelShell, PanelEmptyState } from "./PanelShell"
@@ -166,17 +167,18 @@ function TaskRow({
           )}
         />
         {task.dueDate && (
-          <span
-            className={cn(
-              "hidden text-xs sm:inline",
-              isOverdue
-                ? "text-destructive"
-                : "text-muted-foreground"
-            )}
-            title={formatTargetDate(task.dueDate)}
-          >
-            {describeCountdown(days)}
-          </span>
+          <Hint text={formatTargetDate(task.dueDate)}>
+            <span
+              className={cn(
+                "hidden text-xs sm:inline",
+                isOverdue
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+              )}
+            >
+              {describeCountdown(days)}
+            </span>
+          </Hint>
         )}
       </div>
       <Button

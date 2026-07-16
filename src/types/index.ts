@@ -27,6 +27,46 @@ export type Route = {
 
 export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
+/**
+ * A reference link. `label` is a short alias shown instead of the raw URL;
+ * when it's blank (a link migrated from before aliases existed, or one you
+ * haven't named), consumers fall back to showing the URL itself.
+ */
+export type HabitLink = {
+  label: string
+  url: string
+}
+
+/**
+ * What was actually done on a specific date — frozen at check-off time.
+ *
+ * A record exists if and only if the habit was completed that date; existence
+ * IS completion, so there is no separate flag that could disagree with it.
+ *
+ * Every measurement is nullable: all-null means "no detail recorded" (a
+ * completion migrated from before we tracked detail, or a habit that had no
+ * target when it was performed). We never invent values we didn't observe.
+ */
+export type HabitPerformance = {
+  date: ISODateString
+  quantity: number | null
+  unitId: HabitUnitId | null
+  restQuantity: number | null
+  restUnitId: HabitUnitId | null
+  totalQuantity: number | null
+  totalUnitId: HabitUnitId | null
+  /**
+   * How much this completion's progressive overload added to the habit's
+   * Duration, or null if not applied.
+   *
+   * We store the *amount* rather than a boolean so that deactivating always
+   * subtracts exactly what was added — even if the Increment setting has since
+   * changed. A flag would force us to subtract the current setting, silently
+   * corrupting the Duration.
+   */
+  appliedIncrement: number | null
+}
+
 export type Habit = {
   id: ID
   name: string
@@ -37,10 +77,14 @@ export type Habit = {
   baseQuantity: number | null
   incrementQuantity: number | null
   unitId: HabitUnitId
+  restQuantity: number | null
+  restUnitId: HabitUnitId | null
+  totalQuantity: number | null
+  totalUnitId: HabitUnitId | null
   actions: string
   context: string
-  links: string[]
-  completedDates: string[]
+  links: HabitLink[]
+  performances: HabitPerformance[]
 }
 
 export type Task = {

@@ -1,5 +1,10 @@
 import { format } from "date-fns"
-import type { DayOfWeek, ExperimentStatus, Goal } from "@/types"
+import type {
+  DayOfWeek,
+  ExperimentStatus,
+  Goal,
+  HabitPerformance,
+} from "@/types"
 
 /** "all" shows every goal; any other value is a goalId to restrict to. */
 export type CalendarFilter = string
@@ -10,11 +15,17 @@ export type CalendarHabit = {
   routeId: string
   displayName: string
   timeOfDay: string | null
-  completedDates: string[]
+  performances: HabitPerformance[]
 }
 
-/** A habit resolved for a specific date, with completion determined. */
-export type DayHabit = CalendarHabit & { completed: boolean }
+/**
+ * A habit resolved for a specific date. `performance` is what was actually
+ * done that day (null if not completed); its existence IS completion.
+ */
+export type DayHabit = CalendarHabit & {
+  completed: boolean
+  performance: HabitPerformance | null
+}
 
 export type CalendarTask = {
   taskId: string
@@ -73,7 +84,7 @@ export function buildCalendarModel(
           routeId: route.id,
           displayName,
           timeOfDay: habit.timeOfDay,
-          completedDates: habit.completedDates,
+          performances: habit.performances,
         }
         for (const day of habit.daysOfWeek) {
           habitsByWeekday[day].push(entry)
@@ -125,10 +136,10 @@ export function itemsForDate(
   const weekday = date.getDay() as DayOfWeek
   const key = formatDateKey(date)
 
-  const habits: DayHabit[] = model.habitsByWeekday[weekday].map((h) => ({
-    ...h,
-    completed: h.completedDates.includes(key),
-  }))
+  const habits: DayHabit[] = model.habitsByWeekday[weekday].map((h) => {
+    const performance = h.performances.find((p) => p.date === key) ?? null
+    return { ...h, performance, completed: performance !== null }
+  })
 
   const experiments = model.experiments.filter((e) => {
     const start = e.startDate ?? e.endDate

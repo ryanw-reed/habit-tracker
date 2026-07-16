@@ -5,6 +5,7 @@ import type {
   Experiment,
   Goal,
   Habit,
+  HabitPerformance,
   MaintenanceItem,
   Route,
   Task,
@@ -17,7 +18,7 @@ type GoalDraft = {
   targetDate?: string | null
 }
 
-type HabitDraft = Omit<Habit, "id" | "completedDates">
+type HabitDraft = Omit<Habit, "id" | "performances">
 type TaskDraft = Omit<Task, "id" | "completed"> & {
   completed?: boolean
 }
@@ -60,6 +61,21 @@ type GoalsState = {
     direction: -1 | 1
   ) => void
   toggleHabitCompletion: (
+    goalId: string,
+    routeId: string,
+    habitId: string,
+    dateKey: string
+  ) => void
+  /** Edit what was actually done on a date. Never touches the template. */
+  updateHabitPerformance: (
+    goalId: string,
+    routeId: string,
+    habitId: string,
+    dateKey: string,
+    patch: Partial<Omit<HabitPerformance, "date">>
+  ) => void
+  /** Activate/deactivate the progressive-overload offer for a completed date. */
+  toggleIncrement: (
     goalId: string,
     routeId: string,
     habitId: string,
@@ -238,7 +254,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => {
     },
 
     addHabit: (goalId, routeId, draft) => {
-      const habit: Habit = { id: nanoid(), completedDates: [], ...draft }
+      const habit: Habit = { id: nanoid(), performances: [], ...draft }
       applyRoutePatch(goalId, routeId, (r) => ({
         ...r,
         habits: [...r.habits, habit],
@@ -279,12 +295,81 @@ export const useGoalsStore = create<GoalsState>((set, get) => {
         ...r,
         habits: r.habits.map((h) => {
           if (h.id !== habitId) return h
-          const has = h.completedDates.includes(dateKey)
+          const existingRecord = h.performances.find((p) => p.date === dateKey)
+          if (existingRecord) {
+            // Unchecking deletes the record — existence is completion.
+            return {
+              ...h,
+              performances: h.performances.filter((p) => p.date !== dateKey),
+            }
+          }
+          // Freeze what the habit is right now. This copy is what makes
+          // history immutable: later template edits cannot reach into it.
+          const snapshot: HabitPerformance = {
+            date: dateKey,
+            quantity: h.quantity,
+            unitId: h.unitId,
+            restQuantity: h.restQuantity,
+            restUnitId: h.restUnitId,
+            totalQuantity: h.totalQuantity,
+            totalUnitId: h.totalUnitId,
+            appliedIncrement: null,
+          }
+          return { ...h, performances: [...h.performances, snapshot] }
+        }),
+      }))
+    },
+
+    updateHabitPerformance: (goalId, routeId, habitId, dateKey, patch) => {
+      applyRoutePatch(goalId, routeId, (r) => ({
+        ...r,
+        habits: r.habits.map((h) =>
+          h.id === habitId
+            ? {
+                ...h,
+                performances: h.performances.map((p) =>
+                  p.date === dateKey ? { ...p, ...patch } : p
+                ),
+              }
+            : h
+        ),
+      }))
+    },
+
+    toggleIncrement: (goalId, routeId, habitId, dateKey) => {
+      applyRoutePatch(goalId, routeId, (r) => ({
+        ...r,
+        habits: r.habits.map((h) => {
+          if (h.id !== habitId) return h
+          const performance = h.performances.find((p) => p.date === dateKey)
+          if (!performance) return h
+
+          const setApplied = (amount: number | null) =>
+            h.performances.map((p) =>
+              p.date === dateKey ? { ...p, appliedIncrement: amount } : p
+            )
+
+          // Deactivate: subtract exactly what was added, not whatever the
+          // Increment setting happens to be now.
+          if (performance.appliedIncrement !== null) {
+            return {
+              ...h,
+              quantity:
+                h.quantity === null
+                  ? null
+                  : Math.max(0, h.quantity - performance.appliedIncrement),
+              performances: setApplied(null),
+            }
+          }
+
+          // Activate: nothing to offer without an increment and a duration.
+          if (h.incrementQuantity === null || h.incrementQuantity <= 0) return h
+          if (h.quantity === null) return h
           return {
             ...h,
-            completedDates: has
-              ? h.completedDates.filter((d) => d !== dateKey)
-              : [...h.completedDates, dateKey],
+            // Advances the template only — frozen records are untouched.
+            quantity: h.quantity + h.incrementQuantity,
+            performances: setApplied(h.incrementQuantity),
           }
         }),
       }))
